@@ -2,7 +2,13 @@
 """
 Render the architecture figure for the README.
 
-    python tools/make_pipeline_figure.py     ->  docs/images/pipeline.png
+    python tools/make_pipeline_figure.py
+
+Produces two figures into docs/images/:
+
+    pipeline.png    the architecture: sensors in, world coordinates out
+    assistant.png   a detail view of one stage of it -- what the language
+                    model is given, and what it is allowed to do about it
 
 The layout is the one multi-sensor fusion papers use: one lane per modality
 running left to right, the lanes converging into a single shared
@@ -22,6 +28,12 @@ Everything with data in it is real data. The camera thumbnail is a KITTI frame,
 the point cloud is that frame's Velodyne sweep, the map is the street the drive
 was recorded on with every measured object at its computed coordinates, and the
 assistant card runs a real spatial query against the real scene graph.
+
+The second figure follows the same paper's detail-figure conventions rather
+than its architecture ones: lettered sub-panels, real values in literal cells,
+lighter arrows, and a one-line key for the single mark that needs explaining.
+Splitting it out instead of bolting a fourth lane onto the first figure is the
+reference's own structure -- its Fig. 3 zooms into one step of its Fig. 2.
 
 Needs the KITTI drive under data/kitti (see the README) and, for the map card,
 a network connection. Without the network it falls back to plotting the same
@@ -69,13 +81,15 @@ AMBER = ("#f8b62d", "#fef0d8")    # the camera lane: what the thing is
 BLUE = ("#0081cc", "#d3e5f5")     # the LiDAR lane: where it actually is
 TEAL = ("#00adba", "#d6eef1")     # the shared world representation
 SLATE = ("#8c96a3", "#eceff2")    # the fallback lane: assumed, not measured
-VIOLET = ("#7b61c9", "#eae4f8")   # fixed sensor constants feeding a stage
+VIOLET = ("#7050c4", "#e6def7")   # the language model, and sensor constants
+CRIMSON = ("#a01c2e", "#f7dde1")  # the reference's "look at this" accent
 
 # One Arial-ish grotesque throughout, like the reference. DejaVu is the
 # fallback on machines without Arial; it is wider, so the figure breathes less.
 plt.rcParams.update({
     "font.family": "sans-serif",
     "font.sans-serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"],
+    "font.monospace": ["Consolas", "DejaVu Sans Mono", "Courier New"],
     "figure.facecolor": PAPER,
     "savefig.facecolor": PAPER,
     "text.color": INK,
@@ -90,6 +104,7 @@ F_TITLE = 12.0     # a module's name
 F_SUB = 9.6        # the qualifier under it
 F_HEAD = 13.5      # the group header over the output cards
 F_CHIP = 9.3       # sensor-constant chips and provenance badges
+F_CELL = 8.2       # data cells in the detail figure
 
 LW = 2.2           # glyph outline
 LW_THIN = 1.3
@@ -277,6 +292,20 @@ def chip(ax, cx, cy, w, h, lines, colour=VIOLET):
                 va="center", fontsize=F_CHIP, color="#3a2f66", zorder=6)
 
 
+def text_card(ax, cx, cy, w, h, colour, lines, mono=False):
+    """A tinted card carrying literal text -- a question, a call, a payload."""
+    stroke, fill = colour
+    ax.add_patch(FancyBboxPatch(
+        (cx - w / 2, cy - h / 2), w, h,
+        boxstyle="round,pad=0,rounding_size=0.45",
+        fc=fill, ec=stroke, lw=LW, zorder=3))
+    step = h / (len(lines) + 1)
+    for i, line in enumerate(lines):
+        ax.text(cx, cy + h / 2 - step * (i + 1), line, ha="center", va="center",
+                fontsize=F_CHIP + (0.4 if mono else 1.0), color=INK,
+                family="monospace" if mono else "sans-serif", zorder=6)
+
+
 def badge(ax, cx, cy, text, colour, italic=False):
     """MEASURED / estimated: which of the two paths produced this number."""
     stroke, fill = colour
@@ -375,6 +404,8 @@ def collect():
         "altitude_m": cam0.altitude_m,
     })
 
+    boxes = [(d.x1, d.y1, d.x2, d.y2, d.class_id, d.class_name, d.confidence)
+             for d in first.detections]
     track = [(f.camera["lat"], f.camera["lon"]) for f in result.frames]
     print(f"  {len(placed)} placed detections, {len(track)} camera poses, "
           f"{len(graph.nodes)} objects in frame 0")
@@ -386,6 +417,8 @@ def collect():
         "placed": placed,
         "track": track,
         "graph": graph,
+        "context": graph.to_context(),
+        "boxes": boxes,
         "frames": result.frame_count,
         "tracks": len(result.track_ids()),
     }
@@ -568,6 +601,41 @@ def assistant_thumb(graph, width=575, height=250):
     return card
 
 
+def selection_thumb(image, boxes, matched):
+    """What a tool call looks like on screen: the matches lit, the rest dimmed.
+
+    The frame is darkened wholesale and then the matching boxes are pasted back
+    at full brightness, which is what the viewer does when the assistant
+    narrows a scene. Nothing here decides what matched -- that came from
+    running the query.
+    """
+    base = image.convert("RGB")
+    dim = Image.blend(base, Image.new("RGB", base.size, (10, 12, 16)), 0.58)
+
+    for i, (x1, y1, x2, y2, *_rest) in enumerate(boxes):
+        if i in matched:
+            box = (int(x1), int(y1), int(x2), int(y2))
+            dim.paste(base.crop(box), box)
+
+    draw = ImageDraw.Draw(dim, "RGBA")
+    font = _mono(26)
+    for i, (x1, y1, x2, y2, class_id, class_name, confidence) in enumerate(boxes):
+        if i in matched:
+            colour = CLASS_COLOURS[class_id % len(CLASS_COLOURS)]
+            rgb = tuple(int(colour[k:k + 2], 16) for k in (1, 3, 5))
+            draw.rectangle([x1, y1, x2, y2], outline=rgb, width=6)
+            text = f"{class_name} {confidence * 100:.0f}%"
+            left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+            draw.rectangle([x1, y1 - (bottom - top) - 7,
+                            x1 + (right - left) + 8, y1], fill=rgb)
+            draw.text((x1 + 4, y1 - (bottom - top) - 5), text,
+                      fill=(11, 12, 14), font=font)
+        else:
+            draw.rectangle([x1, y1, x2, y2], outline=(150, 158, 168, 150), width=3)
+
+    return dim
+
+
 def crop_to_aspect(image, aspect):
     """Trim the long side so a card's picture is the shape the card expects."""
     w, h = image.size
@@ -732,6 +800,166 @@ def draw(data) -> None:
     print(f"  pipeline.png  ({path.stat().st_size / 1024:.0f} KB)")
 
 
+# --------------------------------------------------------------------------
+# The second figure: what the assistant is given, and what it can do about it
+#
+# A detail figure, so it follows the reference's detail-figure conventions
+# rather than its architecture one: lettered sub-panels captioned underneath,
+# real values in literal cells, lighter arrows, and a one-line key explaining
+# the one mark that needs explaining.
+# --------------------------------------------------------------------------
+
+
+def cross(ax, cx, cy, s, colour=CRIMSON, lw=4.2):
+    """The reference's crimson accent, used here for the thing that never happens."""
+    for sx in (-1, 1):
+        ax.plot([cx - s * sx, cx + s * sx], [cy - s, cy + s],
+                color=colour[0], lw=lw, solid_capstyle="round", zorder=12)
+
+
+def cell_row(ax, x0, y, h, label, cells, widths, colour):
+    """One labelled strip of data cells, as the reference lays out its values."""
+    stroke, fill = colour
+    ax.text(x0 - 0.7, y + h / 2, label, ha="right", va="center",
+            fontsize=F_CELL + 0.6, color=INK)
+    x = x0
+    for text, w in zip(cells, widths):
+        ax.add_patch(Rectangle((x, y), w, h, fc=fill, ec=stroke, lw=1.0,
+                               zorder=3))
+        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center",
+                fontsize=F_CELL, color=INK, family="monospace", zorder=6)
+        x += w
+    return x
+
+
+def context_rows(context):
+    """The rows of the table, read out of the context the assistant receives.
+
+    Nothing is transcribed by hand: change what `to_context` emits and the
+    table changes with it.
+    """
+    summary = context["summary"]
+    rows = [("summary", [
+        f"{summary['object_count']} objects",
+        f"{summary['lidar_measured_count']} measured · "
+        f"{summary['ground_plane_estimated_count']} est.",
+        f"nearest {summary['nearest']['label']} {summary['nearest']['distance_m']} m",
+        f"far {summary['farthest']['label']} {summary['farthest']['distance_m']} m",
+    ], TEAL)]
+
+    for obj in context["objects"][:2]:
+        rows.append((obj["label"], [
+            f"conf {obj['confidence']:.2f}",
+            f"{obj['distance_m']} m · {obj['side']} {abs(obj['relative_bearing_deg']):.0f}°",
+            f"{obj['latitude']:.6f}, {obj['longitude']:.6f}",
+            f"{obj['position_source']} · {obj['lidar_points']} pts",
+        ], BLUE))
+
+    remaining = len(context["objects"]) - 2
+    rows.append((f"+{remaining} more", ["…", "…", "…", "…"], SLATE))
+
+    first = context["objects"][0]
+    phrases = [f"{r['kind']} {r['target']}" for r in first["relations"][:3]]
+    rows.append(("relations", [f"{first['label']}:  " + "  ·  ".join(phrases)],
+                 AMBER))
+    return rows
+
+
+def draw_assistant(data) -> None:
+    W2, H2 = 109.0, 29.0
+    fig = plt.figure(figsize=(W2 / UNITS_PER_INCH, H2 / UNITS_PER_INCH), dpi=200)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_xlim(0, W2)
+    ax.set_ylim(0, H2)
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+    # ---- (a) what the model is given -------------------------------------
+    img_h = thumb(ax, 10.0, 25.0, 16.0, data["image"])
+    label(ax, 10.0, 25.0 - img_h / 2 - 0.95, "Camera frame", "725 kB of pixels",
+          above=False)
+
+    block_arrow(ax, 18.6, 25.0, 29.4, 25.0, dashed=True, colour=SLATE[0],
+                head_w=1.7, head_l=1.3)
+    cross(ax, 24.0, 25.0, 1.5)
+    ax.text(30.8, 25.9, "the pixels", ha="left", va="center",
+            fontsize=F_TITLE, color=CRIMSON[0])
+    ax.text(30.8, 24.1, "stop here", ha="left", va="center",
+            fontsize=F_TITLE, color=CRIMSON[0])
+
+    rows = context_rows(data["context"])
+    widths = [6.0, 10.0, 10.5, 9.0]
+    row_h, y = 2.05, 18.6
+    for name, cells, colour in rows:
+        y -= row_h
+        cell_row(ax, 8.6, y, row_h, name, cells,
+                 widths if len(cells) > 1 else [sum(widths)], colour)
+    ax.add_patch(Rectangle((8.6, y), sum(widths), 18.6 - y, fc="none",
+                           ec="#2b2b2b", lw=1.8, zorder=15))
+
+    blob = json.dumps(data["context"], separators=(",", ":"))
+    ax.text(22.5, y - 1.0,
+            f"{len(blob) / 1000:.1f} kB  ·  ~{len(blob) // 4} tokens  ·  "
+            f"everything the model is given",
+            ha="center", va="top", fontsize=F_CHIP, color=INK)
+
+    # ---- (b) question in, scene control out ------------------------------
+    text_card(ax, 53.0, 23.4, 13.0, 3.7, AMBER,
+              ['"which objects are', 'within 10 metres?"'])
+    ax.text(53.0, 25.7, "the question", ha="center", va="bottom",
+            fontsize=F_SUB, color=INK)
+
+    text_card(ax, 53.0, 11.6, 13.0, 3.7, TEAL,
+              ["scene JSON", "+ 4 tool schemas"])
+
+    block_arrow(ax, 43.9, 11.6, 45.9, 11.6, head_w=1.7, head_l=1.3)
+
+    ax.plot([62.0, 62.0], [11.6, 23.4], color=INK, lw=3.0,
+            solid_capstyle="butt", zorder=7)
+    for y_in in (23.4, 11.6):
+        ax.plot([59.5, 62.0], [y_in, y_in], color=INK, lw=3.0,
+                solid_capstyle="butt", zorder=7)
+    block_arrow(ax, 62.0, 17.5, 63.9, 17.5, head_w=1.7, head_l=1.3)
+
+    funnel(ax, 67.6, 17.5, 7.2, 5.4, VIOLET)
+    label(ax, 67.6, 20.2, "gpt-5.4-mini", "reads the numbers", above=True)
+
+    block_arrow(ax, 71.3, 17.5, 74.1, 17.5, head_w=1.7, head_l=1.3)
+    text_card(ax, 81.2, 17.5, 14.0, 3.9, AMBER,
+              ["select_objects(", "max_distance_m=10)"], mono=True)
+    ax.text(81.2, 19.85, "the tool call", ha="center", va="bottom",
+            fontsize=F_SUB, color=INK)
+
+    img_w, img_h = data["selection"].size
+    card_w = 16.4
+    block_arrow(ax, 88.3, 17.5, 91.0, 17.5, head_w=1.7, head_l=1.3)
+    result_card(ax, 99.4, 17.5, card_w, data["selection"],
+                "2 of 5, everywhere at once", card_w * img_h / img_w, 1.75)
+
+    # the tool runs on this machine, and what it returns goes back in
+    for seg in (([81.2, 81.2], [15.55, 7.6]), ([81.2, 67.6], [7.6, 7.6])):
+        ax.plot(*seg, color=INK, lw=2.4, solid_capstyle="butt", zorder=7)
+    block_arrow(ax, 67.6, 7.6, 67.6, 14.8, head_w=1.6, head_l=1.2, shaft=0.45)
+    ax.text(74.4, 6.8, "runs here, against the graph  ·  result back to the "
+            "model  ·  up to 3 rounds",
+            ha="center", va="top", fontsize=F_CHIP, color=INK)
+
+    # ---- captions and the key --------------------------------------------
+    ax.text(22.5, 3.0, "(a) What the model is given", ha="center", va="top",
+            fontsize=F_HEAD)
+    ax.text(78.0, 3.0, "(b) Question in, scene control out", ha="center",
+            va="top", fontsize=F_HEAD)
+
+    cross(ax, 3.4, 1.0, 0.75, lw=3.0)
+    ax.text(5.2, 1.0, ":  never sent to the model", ha="left", va="center",
+            fontsize=F_CHIP, color=INK)
+
+    path = OUT / "assistant.png"
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+    print(f"  assistant.png ({path.stat().st_size / 1024:.0f} KB)")
+
+
 def main() -> int:
     data = collect()
     aspect = CARD_W / CARD_IMG_H
@@ -748,9 +976,13 @@ def main() -> int:
         raise SystemExit(1)
     data["scene3d"] = crop_to_aspect(Image.open(scene3d).convert("RGB"), aspect)
 
+    hits = scene_graph.select(data["graph"], max_distance_m=10)
+    data["selection"] = selection_thumb(
+        data["image"], data["boxes"], {n.id for n in hits})
+
     draw(data)
-    print(f"\nWrote the architecture figure to "
-          f"{(OUT / 'pipeline.png').relative_to(ROOT)}")
+    draw_assistant(data)
+    print(f"\nWrote both figures to {OUT.relative_to(ROOT)}")
     return 0
 
 

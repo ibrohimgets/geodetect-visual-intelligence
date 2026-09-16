@@ -15,9 +15,9 @@ it actually is. The dashed lane is what happens when there is no depth sensor to
 ask -- same detections, a flat-ground assumption instead of a measurement, and a
 label that says so. Laid out the way multi-sensor fusion papers lay this out;
 [BEVFusion](https://arxiv.org/abs/2205.13542) (Fig. 2) is the reference for the
-visual language. `python tools/make_pipeline_figure.py` regenerates it, and the
-thumbnails, the map and the assistant card are all produced by running the
-pipeline rather than drawn by hand.*
+visual language. `python tools/make_pipeline_figure.py` regenerates this and the
+assistant figure further down, and the thumbnails, the map and the assistant
+card are all produced by running the pipeline rather than drawn by hand.*
 
 With a **real KITTI drive** loaded, the positions are not inferred at all: the
 Velodyne LiDAR supplies true depth, the OXTS GPS/IMU supplies the vehicle's
@@ -192,6 +192,15 @@ Panels resize by dragging the splitters (double-click resets, sizes persist).
 full screen; `Space` plays; `Esc` clears the selection.
 
 ### Geo Intelligence Assistant
+
+![What the assistant is given, and what it can do about it](docs/images/assistant.png)
+
+*A detail view of one stage of the pipeline above, in the same drawing
+convention the reference paper uses for its own zoom-ins. **(a)** is the whole
+of what the model receives: 3.1 kB of measurements, and none of the 725 kB of
+pixels they were measured from. **(b)** is the loop — the model chooses a tool,
+the tool runs **here**, against the scene graph, and what it returns goes back
+in. Without a key the panel falls back to local lookups and says so.*
 
 The assistant **never sees the image**. It receives the structured scene graph —
 classes, confidences, distances, bearings, coordinates, and spatial relations —
@@ -450,7 +459,7 @@ frontend/
     palette.js              one colour + glyph per class, shared by all views
 tools/make_sample_video.py  generates the demo clip
 tools/make_figures.py       regenerates the README figures
-tools/make_pipeline_figure.py  regenerates the architecture figure
+tools/make_pipeline_figure.py  regenerates the architecture figures
 ```
 
 ### Why analyze and reproject are separate endpoints
