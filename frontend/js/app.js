@@ -921,10 +921,15 @@ async function doExport(fmt) {
 
   try {
     if (fmt === 'png') {
-      const blob = await overlay.toBlob();
+      // Capture whichever pane is in front. In the four-pane layout there is no
+      // single "current" view, so fall back to the detection pane.
+      const view = $('viewport').dataset.view;
+      const from3d = view === 'scene';
+      const blob = from3d ? await scene3d.toBlob() : await overlay.toBlob();
       if (!blob) throw new Error('nothing to capture');
-      api.saveBlob(blob, `${source.replace(/\.[^.]+$/, '')}_detections.png`);
-      toast('screenshot saved', 'ok');
+      const stem = source.replace(/\.[^.]+$/, '');
+      api.saveBlob(blob, `${stem}_${from3d ? 'scene3d' : 'detections'}.png`);
+      toast(`${from3d ? '3D scene' : 'detection'} snapshot saved`, 'ok');
       return;
     }
     const visible = panel.visibleIdSet();

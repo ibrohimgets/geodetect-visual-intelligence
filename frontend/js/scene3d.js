@@ -55,9 +55,13 @@ export class Scene3D {
     this.showTrails = true;
     this.objects = new Map();
 
-    // alpha:true lets the pane's CSS gradient show through, which keeps the
-    // 3D view sitting in the same light theme as the rest of the dashboard.
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // preserveDrawingBuffer keeps the rendered frame readable after the
+    // browser composites it, which is what makes toBlob() below possible. It
+    // costs a little memory bandwidth; being able to export the view is worth
+    // more than that here.
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true, alpha: true, preserveDrawingBuffer: true,
+    });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(container.clientWidth || 1, container.clientHeight || 1);
     container.appendChild(this.renderer.domElement);
@@ -525,6 +529,19 @@ export class Scene3D {
   }
 
   // ------------------------------------------------------------------ plumbing
+
+  /**
+   * The current 3D view as a PNG blob.
+   *
+   * Renders once immediately beforehand rather than trusting whatever the
+   * animation loop last left in the buffer, so the exported image always
+   * matches what is on screen at the moment of capture.
+   */
+  toBlob() {
+    this.renderer.render(this.scene, this.camera);
+    return new Promise((resolve) =>
+      this.renderer.domElement.toBlob(resolve, 'image/png'));
+  }
 
   resize() {
     const w = this.container.clientWidth;

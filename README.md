@@ -3,6 +3,11 @@
 Upload an image or a video, detect everyday objects, estimate where each one
 actually is in the world, and then *interrogate the scene in plain language*.
 
+![YOLOv8 detections with LiDAR-measured range](docs/images/detections.jpg)
+
+*Real KITTI frame. Every box carries a class, a confidence and a distance —
+and the distance came off the Velodyne, not out of the network.*
+
 ```
   camera image ──▶ YOLO detection ──┐
                                     ├──▶ world coordinates ──┐
@@ -76,6 +81,67 @@ WGS84 position stays put to within 0.7 m. Ego motion cancelling that precisely
 means the calibration, the LiDAR projection, the IMU rotation and the yaw
 convention are all correct together. That check is
 [`test_parked_cars_stay_put_while_the_vehicle_drives_past`](backend/tests/test_kitti.py).
+
+### What it produces
+
+All of these come straight out of the pipeline on the bundled KITTI drive.
+`python tools/make_figures.py` regenerates every one of them, so they cannot
+drift away from what the code actually does.
+
+**LiDAR projected into the camera frame** — the check that the calibration is
+right. Returns hug the cars and the kerb, stop dead at the sky, and thin out
+with distance. Colour is measured range.
+
+![Velodyne point cloud projected into the camera image](docs/images/lidar-projection.png)
+
+**Tracking** — ByteTrack keeps each object's identity as the vehicle drives.
+`car_03` is the same car at 21.7 m, 16.3 m, 10.7 m and 5.5 m; the colour is
+keyed to the track id, not the class.
+
+![The same objects tracked across four moments of the drive](docs/images/tracking.jpg)
+
+**The 3D world view**, captured from the running app: ground grid, distance
+rings, camera frustum, a ray from the camera to each object, and solids sized
+from the measured extents.
+
+![3D scene with distance rings and measured object positions](docs/images/scene-3d.png)
+
+**Bird's eye view** — the LiDAR wraps a full 360°, the camera sees 81° of it,
+and the detections sit where the fusion put them.
+
+![Bird's eye view of one frame](docs/images/bev.png)
+
+---
+
+### Does the geometry actually work?
+
+Two figures, both generated from the data rather than asserted in prose.
+
+**What the flat-ground assumption costs.** Both numbers below come from the
+same detection box: one reads the range off the LiDAR, the other assumes the
+object stands on a flat plane at a known camera height. The estimate holds up
+close and degrades with distance, which is exactly the failure mode you would
+predict — small angular errors near the horizon become large range errors.
+Median error −2.4 m, 90th percentile 5.2 m. This is why the UI labels the two
+paths differently instead of quietly averaging them.
+
+![LiDAR range against the flat-ground estimate](docs/images/measured-vs-estimated.png)
+
+**Ego-motion cancellation** — the end-to-end check, and the one that would
+catch a consistent error anywhere in the chain. Left: relative to the camera,
+every parked car sweeps past in a long straight line. Right: on the Earth, the
+same cars collapse to tight clusters while the vehicle covers 17 m. If the
+calibration, the LiDAR projection, the IMU rotation or the yaw convention were
+wrong, the right-hand panel would smear as badly as the left.
+
+![Objects hold their world position while the vehicle drives past](docs/images/ego-motion.png)
+
+The residual spread — a median 2.46 m — is not fusion error. A LiDAR only sees
+the faces pointing at it, so the centroid of a car's returns migrates from its
+back towards its side as you drive past. That is geometry, and it sets the
+floor on this measurement.
+
+---
 
 ### The interface
 
@@ -387,6 +453,7 @@ frontend/
     splitter.js             resizable layout
     palette.js              one colour + glyph per class, shared by all views
 tools/make_sample_video.py  generates the demo clip
+tools/make_figures.py       regenerates the README figures
 ```
 
 ### Why analyze and reproject are separate endpoints
