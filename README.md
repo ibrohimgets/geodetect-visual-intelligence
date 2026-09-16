@@ -8,20 +8,16 @@ actually is in the world, and then *interrogate the scene in plain language*.
 *Real KITTI frame. Every box carries a class, a confidence and a distance —
 and the distance came off the Velodyne, not out of the network.*
 
-```
-  camera image ──▶ YOLO detection ──┐
-                                    ├──▶ world coordinates ──┐
-  LiDAR + GPS/IMU + calibration ────┘    MEASURED or          │
-                                          estimated           │
-                            ┌─────────────────────────────────┤
-                            ▼                 ▼               ▼
-                        GIS map          3D world view   scene graph
-                      (Leaflet, WGS84)  (Three.js, ENU)  (spatial relations)
-                                                              │
-                                                              ▼
-                                                Geo Intelligence Assistant
-                                                  (LLM over measurements)
-```
+![Architecture: two sensor lanes converging on one world representation](docs/images/pipeline.png)
+
+*The amber lane works out **what** a thing is. The blue lane works out **where**
+it actually is. The dashed lane is what happens when there is no depth sensor to
+ask -- same detections, a flat-ground assumption instead of a measurement, and a
+label that says so. Laid out the way multi-sensor fusion papers lay this out;
+[BEVFusion](https://arxiv.org/abs/2205.13542) (Fig. 2) is the reference for the
+visual language. `python tools/make_pipeline_figure.py` regenerates it, and the
+thumbnails, the map and the assistant card are all produced by running the
+pipeline rather than drawn by hand.*
 
 With a **real KITTI drive** loaded, the positions are not inferred at all: the
 Velodyne LiDAR supplies true depth, the OXTS GPS/IMU supplies the vehicle's
@@ -454,6 +450,7 @@ frontend/
     palette.js              one colour + glyph per class, shared by all views
 tools/make_sample_video.py  generates the demo clip
 tools/make_figures.py       regenerates the README figures
+tools/make_pipeline_figure.py  regenerates the architecture figure
 ```
 
 ### Why analyze and reproject are separate endpoints
