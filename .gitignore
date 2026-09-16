@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Model weights (downloaded on first run, ~6 MB each)
+models/*.pt
+
+# Processed uploads (regenerated at runtime)
+data/uploads/*
+!data/uploads/.gitkeep
+
+# Local tool config, not shared
+.claude/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Generated demo clip (run: python tools/make_sample_video.py)
+data/samples/street-pan.mp4
+data/samples/street-pan.webm
+data/samples/.probe*
+
+# Real sensor data (see README: one curl + unzip to fetch)
+data/kitti/

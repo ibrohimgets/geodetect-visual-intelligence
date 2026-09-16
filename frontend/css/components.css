@@ -1,0 +1,431 @@
+/* ============================================================================
+   Components: the entity tree, property rows, the object table, the inspector
+   and the assistant.
+
+   The two structural borrowings from this class of tool:
+
+     * a left TREE of sources and sensors with disclosure triangles, type icons
+       and per-item visibility checkboxes -- the thing Foxglove calls Topics and
+       Rerun calls the Blueprint;
+     * a right INSPECTOR showing the properties of whatever is selected, as
+       label/value rows rather than as a form.
+   ========================================================================== */
+
+/* ══════════════════════════ TREE ══════════════════════════ */
+
+.tree { padding: 2px 0; }
+.tree-group { user-select: none; }
+
+.tree-head {
+  display: flex; align-items: center; gap: 5px;
+  height: var(--row);
+  padding: 0 7px 0 4px;
+  cursor: pointer;
+}
+.tree-head:hover { background: var(--bg-3); }
+.tree-head .tw {
+  width: 12px; height: 12px;
+  display: grid; place-items: center;
+  color: var(--fg-4);
+  flex: 0 0 auto;
+  transition: transform .12s linear;
+}
+.tree-group.closed .tree-head .tw { transform: rotate(-90deg); }
+.tree-group.closed .tree-items { display: none; }
+.tree-head .lbl {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.tree-head .meta {
+  margin-left: auto;
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--fg-4);
+}
+
+.tree-items { padding-bottom: 3px; }
+
+.tree-item {
+  position: relative;
+  display: flex; align-items: center; gap: 6px;
+  height: var(--row);
+  padding: 0 7px 0 21px;
+  cursor: pointer;
+  color: var(--fg-2);
+  font-size: var(--fs);
+  white-space: nowrap;
+}
+.tree-item:hover { background: var(--bg-3); color: var(--fg); }
+.tree-item.on { background: var(--accent-bg); color: var(--fg); }
+.tree-item.on::before {
+  content: ""; position: absolute; left: 0; top: 0;
+  width: 2px; height: 100%;
+  background: var(--accent);
+}
+.tree-item .ic { color: var(--fg-4); }
+.tree-item.on .ic { color: var(--accent); }
+.tree-item .nm { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.tree-item .side { font-family: var(--mono); font-size: var(--fs-xs); color: var(--fg-4); }
+.tree-item .tag { margin-left: auto; }
+
+/* sensor rows carry a visibility checkbox, like a layer list */
+.sensor-row {
+  display: flex; align-items: center; gap: 6px;
+  height: var(--row);
+  padding: 0 7px 0 8px;
+  font-size: var(--fs);
+  color: var(--fg-2);
+}
+.sensor-row:hover { background: var(--bg-3); }
+.sensor-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.sensor-row .val { font-family: var(--mono); font-size: var(--fs-xs); color: var(--fg-4); }
+.sensor-row.off { color: var(--fg-4); }
+
+/* ══════════════════════════ PROPERTY ROWS ══════════════════════════ */
+
+/* Label right-aligned on the left, control on the right. The workhorse layout
+   of every settings panel in this class of tool. */
+.prop {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-height: var(--row);
+  padding: 1px 7px;
+}
+.prop > label, .prop > .k {
+  font-size: var(--fs);
+  color: var(--fg-3);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.prop .v {
+  font-family: var(--mono); font-size: var(--fs);
+  color: var(--fg);
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.prop .pair { display: flex; align-items: center; gap: 5px; }
+.prop .pair input[type=range] { flex: 1; min-width: 0; }
+.prop .pair input.num { width: 56px; flex: 0 0 56px; }
+.prop-note {
+  grid-column: 2;
+  font-size: var(--fs-xs);
+  color: var(--fg-4);
+}
+.prop-wide { grid-template-columns: 1fr; }
+
+.section-note {
+  padding: 5px 8px;
+  font-size: var(--fs-sm);
+  color: var(--fg-3);
+  background: var(--bg-2);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.section-note.ok   { color: var(--ok);   background: var(--ok-bg); }
+.section-note.warn { color: var(--warn); background: var(--warn-bg); }
+.section-note .mono { display: block; color: var(--fg-2); font-size: var(--fs-xs); }
+.section-note button {
+  margin-top: 4px; height: 18px; padding: 0 7px;
+  color: var(--fg); background: var(--bg-3);
+  border: 1px solid var(--line-2); border-radius: var(--r);
+  font-size: var(--fs-xs); cursor: pointer;
+}
+.section-note button:hover { background: var(--bg-4); }
+
+/* drop target */
+.drop {
+  margin: 6px 7px;
+  padding: 10px;
+  text-align: center;
+  color: var(--fg-3);
+  background: var(--bg-input);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r);
+  cursor: pointer;
+  font-size: var(--fs);
+}
+.drop:hover, .drop.over { border-color: var(--accent); color: var(--fg); background: var(--accent-bg); }
+.drop .k {
+  display: block; margin-top: 2px;
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--fg-4);
+}
+
+/* progress */
+.prog { padding: 4px 8px 7px; }
+.prog-top {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--fg-3);
+  margin-bottom: 3px;
+}
+.prog-rail { height: 3px; background: var(--bg-input); border: 1px solid var(--line); }
+.prog-fill { height: 100%; width: 0; background: var(--accent); transition: width .2s linear; }
+
+/* ══════════════════════════ OBJECT TABLE ══════════════════════════ */
+
+.table-panel { display: flex; flex-direction: column; min-height: 0; background: var(--bg-1); }
+.table-wrap { flex: 1; overflow: auto; min-height: 0; position: relative; }
+
+.otable { width: 100%; border-collapse: collapse; }
+
+.otable thead th {
+  position: sticky; top: 0; z-index: 2;
+  height: 20px;
+  padding: 0 8px;
+  text-align: left;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line-2);
+  cursor: pointer;
+  user-select: none;
+}
+.otable thead th:hover { color: var(--fg-2); }
+.otable th.n { text-align: right; }
+
+.otable tbody td {
+  height: 20px;
+  padding: 0 8px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--fs);
+}
+.otable tbody tr { cursor: pointer; }
+.otable tbody tr:nth-child(even) { background: rgba(255,255,255,.012); }
+.otable tbody tr:hover { background: var(--bg-3); }
+.otable tbody tr.sel { background: var(--accent-bg); }
+.otable tbody tr.sel td { border-bottom-color: var(--accent-line); }
+.otable tbody tr.nofix { color: var(--fg-3); }
+
+.otable td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.otable td.idx { font-family: var(--mono); font-size: var(--fs-xs); color: var(--fg-4); }
+
+.obj { display: flex; align-items: center; gap: 6px; }
+.obj .sw { width: 8px; height: 8px; flex: 0 0 auto; }
+.obj .nm { font-family: var(--mono); }
+
+.conf { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
+.conf-rail { width: 26px; height: 2px; background: var(--line-2); }
+.conf-fill { height: 100%; background: var(--fg-2); }
+.conf-v { font-family: var(--mono); width: 24px; text-align: right; }
+
+.table-empty {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--fg-4);
+  pointer-events: none;
+}
+
+/* filter chips in the table header */
+.chips { display: flex; gap: 2px; align-items: center; }
+.fchip {
+  height: 17px; padding: 0 7px;
+  font-family: var(--mono); font-size: var(--fs-xs);
+  letter-spacing: .04em;
+  color: var(--fg-3);
+  background: none;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fchip:hover { color: var(--fg); border-color: var(--fg-4); }
+.fchip.on { color: var(--accent); background: var(--accent-bg); border-color: var(--accent-line); }
+.fchip:disabled { opacity: .35; cursor: not-allowed; }
+
+.qfilter { width: 118px; height: 17px; font-size: var(--fs-sm); }
+
+.selchip {
+  display: flex; align-items: center; gap: 5px;
+  height: 17px; padding: 0 3px 0 7px;
+  font-family: var(--mono); font-size: var(--fs-xs);
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r);
+  max-width: 250px; white-space: nowrap;
+}
+.selchip span { overflow: hidden; text-overflow: ellipsis; }
+.selchip button {
+  width: 13px; height: 13px;
+  display: grid; place-items: center;
+  color: var(--accent); background: none; border: 0;
+  cursor: pointer; font-size: 13px; line-height: 1;
+}
+.selchip button:hover { color: var(--fg); }
+
+/* ══════════════════════════ INSPECTOR ══════════════════════════ */
+
+.inspect-empty { padding: 9px 8px; font-size: var(--fs); color: var(--fg-4); }
+.inspect-title {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.inspect-title .sw { width: 9px; height: 9px; flex: 0 0 auto; }
+.inspect-title .nm { font-family: var(--mono); font-size: var(--fs-md); color: var(--fg); }
+
+/* ══════════════════════════ ASSISTANT ══════════════════════════ */
+
+.assistant { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+
+.chat {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  padding: 7px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+
+.chat-intro { font-size: var(--fs); color: var(--fg-3); line-height: 1.5; }
+.chat-intro b { color: var(--fg-2); font-weight: 500; }
+.chat-intro p { margin: 0 0 5px; }
+
+.msg { display: flex; flex-direction: column; }
+.msg.me { align-items: flex-end; }
+.bubble {
+  max-width: 96%;
+  padding: 5px 8px;
+  font-size: var(--fs);
+  line-height: 1.5;
+  border-radius: var(--r);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.msg.me .bubble  { color: #fff; background: var(--accent-2); }
+.msg.bot .bubble { color: var(--fg); background: var(--bg-2); border: 1px solid var(--line); }
+.bubble code {
+  font-family: var(--mono); font-size: var(--fs-sm);
+  padding: 0 3px; background: var(--bg-0); border-radius: 1px;
+}
+.bubble em { color: var(--fg-3); font-style: normal; font-size: var(--fs-sm); }
+
+/* The model's working, shown rather than hidden: this is an instrument, so the
+   query that produced a highlight should be inspectable. */
+.trace {
+  font-family: var(--mono); font-size: var(--fs-xs);
+  color: var(--fg-3);
+  padding: 4px 7px;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent-line);
+  white-space: pre-wrap; word-break: break-all;
+}
+.trace b { color: var(--accent); font-weight: 600; }
+
+.typing { display: flex; gap: 3px; padding: 7px 9px; }
+.typing i { width: 4px; height: 4px; background: var(--fg-4); animation: blink 1s steps(2,start) infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; }
+.typing i:nth-child(3) { animation-delay: .3s; }
+
+.suggest { display: flex; flex-wrap: wrap; gap: 3px; padding: 0 7px 6px; }
+.suggest button {
+  height: 17px; padding: 0 6px;
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.suggest button:hover { color: var(--accent); border-color: var(--accent-line); background: var(--accent-bg); }
+
+.composer {
+  display: flex; align-items: flex-end; gap: 5px;
+  padding: 6px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.composer textarea { flex: 1; max-height: 90px; }
+.composer .ib { width: 22px; height: 22px; color: var(--accent); }
+.composer .ib:hover { background: var(--accent-bg); }
+
+/* scene graph readout */
+.scene-tree {
+  margin: 0; padding: 6px 8px;
+  font-family: var(--mono); font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--fg-2);
+  white-space: pre;
+  overflow: auto;
+}
+
+/* ══════════════════════════ MAP SKIN ══════════════════════════ */
+
+.leaflet-container { background: var(--bg-0); font-family: var(--sans); font-size: var(--fs); }
+.leaflet-control-attribution {
+  background: rgba(11,12,14,.8) !important;
+  color: var(--fg-4) !important;
+  font-size: var(--fs-xs) !important;
+}
+.leaflet-control-attribution a { color: var(--fg-3) !important; }
+.leaflet-bar { border: 1px solid var(--line-2) !important; }
+.leaflet-bar a {
+  background: var(--bg-2) !important;
+  color: var(--fg-2) !important;
+  border-color: var(--line) !important;
+}
+.leaflet-bar a:hover { background: var(--bg-3) !important; }
+.leaflet-control-layers {
+  background: var(--bg-2) !important;
+  border: 1px solid var(--line-2) !important;
+  border-radius: var(--r) !important;
+  color: var(--fg-2);
+}
+.leaflet-control-layers-expanded { padding: 5px 7px !important; font-size: var(--fs); }
+.leaflet-control-layers label { margin-bottom: 2px; }
+.leaflet-control-scale-line {
+  background: rgba(11,12,14,.8) !important;
+  border-color: var(--line-2) !important;
+  color: var(--fg-3) !important;
+  font-family: var(--mono); font-size: var(--fs-xs) !important;
+}
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: var(--bg-2);
+  color: var(--fg);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  box-shadow: none;
+}
+.leaflet-popup-content { margin: 7px 9px; font-size: var(--fs); }
+.leaflet-popup-content b { font-family: var(--mono); }
+.leaflet-popup-close-button { color: var(--fg-3) !important; }
+.popup-grid {
+  display: grid; grid-template-columns: auto auto; gap: 1px 10px;
+  margin-top: 5px;
+  font-family: var(--mono); font-size: var(--fs-xs);
+}
+.popup-grid span:nth-child(odd) { color: var(--fg-4); }
+.popup-src { margin-top: 4px; font-family: var(--mono); font-size: var(--fs-xs); }
+
+.obj-marker {
+  display: grid; place-items: center;
+  width: 100%; height: 100%;
+  border: 1px solid rgba(0,0,0,.6);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.25);
+}
+.obj-marker.selected {
+  transform: scale(1.4);
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--accent);
+  z-index: 1000;
+}
+.obj-marker svg { width: 10px; height: 10px; stroke: #fff; fill: none; stroke-width: 2.2; }
+
+.marker-cluster { background: rgba(76,141,255,.2); }
+.marker-cluster div {
+  width: 26px; height: 26px; margin: 3px;
+  display: grid; place-items: center;
+  background: var(--accent-2);
+  color: #fff;
+  font-family: var(--mono); font-size: var(--fs-sm); font-weight: 600;
+}

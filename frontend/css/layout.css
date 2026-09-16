@@ -1,0 +1,510 @@
+/* ============================================================================
+   App shell.
+
+     ┌──────────────────────────────────────────────────────────┐
+     │ menu bar                                                 │  34px
+     ├────────┬───────────────────────────────────┬─────────────┤
+     │ left   │  viewport (panes, each titled)    │  inspector  │
+     │ tree   ├───────────────────────────────────┤             │
+     │        │  object table                     │             │
+     ├────────┴───────────────────────────────────┴─────────────┤
+     │ timeline: transport + per-track streams                  │  150px
+     ├──────────────────────────────────────────────────────────┤
+     │ status bar                                               │  22px
+     └──────────────────────────────────────────────────────────┘
+
+   The timeline spans the full width rather than sitting inside the centre
+   column, because time is global: it applies to every pane at once. That is
+   the arrangement Foxglove and Rerun both settle on, and the reason is the
+   same here.
+   ========================================================================== */
+
+.app {
+  display: grid;
+  grid-template-rows: var(--topbar) minmax(0, 1fr) auto var(--statusbar);
+  height: 100vh;
+}
+
+/* ══════════════════════════ MENU BAR ══════════════════════════ */
+
+.menubar {
+  display: flex; align-items: center; gap: 6px;
+  height: var(--topbar);
+  padding: 0 8px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.app-id { display: flex; align-items: center; gap: 6px; padding-right: 8px; }
+.app-mark { width: 15px; height: 15px; fill: none; stroke: var(--accent); stroke-width: 1.7;
+            stroke-linecap: round; stroke-linejoin: round; }
+.app-name { font-family: var(--mono); font-size: var(--fs-md); font-weight: 600; letter-spacing: .04em; }
+.app-ver  { font-family: var(--mono); font-size: var(--fs-xs); color: var(--fg-4); }
+
+.menubar .sep { width: 1px; height: 16px; background: var(--line-2); margin: 0 2px; }
+.menubar .spacer { flex: 1; }
+
+/* pipeline stage readout */
+.stages { display: flex; align-items: center; gap: 0; }
+.stage {
+  display: flex; align-items: center; gap: 4px;
+  height: 18px; padding: 0 7px;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.stage::before { content: ""; width: 4px; height: 4px; background: currentColor; }
+.stage + .stage { margin-left: 1px; }
+.stage.done { color: var(--fg-2); }
+.stage.done::before { background: var(--ok); }
+.stage.active { color: var(--accent); background: var(--accent-bg); border-color: var(--accent-line); }
+.stage.active::before { background: var(--accent); animation: blink .9s steps(2, start) infinite; }
+
+/* status chips on the right */
+.chip {
+  display: flex; align-items: center; gap: 5px;
+  height: 20px; padding: 0 7px;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  white-space: nowrap;
+}
+
+/* drop-down menu */
+.menu-wrap { position: relative; }
+.menu {
+  position: absolute; top: calc(100% + 3px); right: 0;
+  min-width: 190px;
+  padding: 3px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  z-index: 200;
+}
+.menu button {
+  display: flex; align-items: baseline; gap: 8px;
+  width: 100%; height: 22px;
+  padding: 0 7px;
+  color: var(--fg);
+  background: none; border: 0;
+  text-align: left;
+  font-size: var(--fs);
+  cursor: pointer;
+}
+.menu button:hover { background: var(--accent-2); color: #fff; }
+.menu button span { margin-left: auto; font-family: var(--mono); font-size: var(--fs-xs); color: var(--fg-4); }
+.menu button:hover span { color: rgba(255,255,255,.7); }
+.menu hr { margin: 3px 0; border: 0; border-top: 1px solid var(--line); }
+
+/* ══════════════════════════ WORKSPACE ══════════════════════════ */
+
+.work {
+  --w-l: var(--rail-l);
+  --w-r: var(--rail-r);
+  display: grid;
+  grid-template-columns: var(--w-l) 4px minmax(0, 1fr) 4px var(--w-r);
+  min-height: 0;
+  background: var(--line);
+}
+.work > * { min-width: 0; min-height: 0; }
+
+/* ---- panels ---- */
+
+.panel {
+  display: flex; flex-direction: column;
+  min-height: 0;
+  background: var(--bg-1);
+  overflow: hidden;
+}
+
+/* Every panel and pane carries a title bar. It is what makes a region feel
+   like a component you could dock elsewhere rather than a div. */
+.panel-head {
+  display: flex; align-items: center; gap: 6px;
+  height: var(--header);
+  flex: 0 0 var(--header);
+  padding: 0 4px 0 7px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.panel-head .t {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  white-space: nowrap;
+}
+.panel-head .count {
+  font-family: var(--mono); font-size: var(--fs-xs);
+  color: var(--fg-4);
+}
+.panel-head .grow { flex: 1; }
+
+.panel-body { flex: 1; min-height: 0; overflow: auto; }
+
+/* ---- splitters ---- */
+
+.split { background: var(--line); cursor: col-resize; position: relative; z-index: 10; }
+.split::after {
+  content: ""; position: absolute; inset: 0;
+}
+.split:hover, .split.drag { background: var(--accent); }
+.split-h { cursor: row-resize; height: 4px; }
+body.resizing   { cursor: col-resize; user-select: none; }
+body.resizing-v { cursor: row-resize; user-select: none; }
+
+/* ══════════════════════════ CENTRE ══════════════════════════ */
+
+.centre {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 4px var(--h-table, 190px);
+  min-height: 0;
+  background: var(--line);
+}
+.centre > * { min-width: 0; min-height: 0; }
+
+/* viewport: a grid of panes */
+.viewport {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+  min-height: 0;
+}
+.viewport[data-view="image"], .viewport[data-view="map"], .viewport[data-view="scene"] {
+  grid-template-columns: 1fr; grid-template-rows: 1fr;
+}
+.viewport[data-view="image"] .pane-image,
+.viewport[data-view="map"]   .pane-map,
+.viewport[data-view="scene"] .pane-scene { display: flex; }
+
+.viewport[data-view="grid"] {
+  grid-template-columns: 1.3fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas: "img map" "img scn";
+}
+.viewport[data-view="grid"] .pane { display: flex; }
+.viewport[data-view="grid"] .pane-image { grid-area: img; }
+.viewport[data-view="grid"] .pane-map   { grid-area: map; }
+.viewport[data-view="grid"] .pane-scene { grid-area: scn; }
+
+/* ---- a pane ---- */
+
+.pane {
+  display: none;
+  flex-direction: column;
+  background: var(--bg-0);
+  min-width: 0; min-height: 0;
+  position: relative;
+}
+
+.pane-head {
+  display: flex; align-items: center; gap: 6px;
+  height: var(--header);
+  flex: 0 0 var(--header);
+  padding: 0 4px 0 7px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.pane-head .ic { color: var(--fg-3); }
+.pane-head .t {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  letter-spacing: .05em;
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.pane-head .frame-info {
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--fg-4);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pane-head .grow { flex: 1; min-width: 0; }
+
+/* The provenance badge. Sits in the pane header rather than floating over the
+   content, because it is metadata about the pane, not an annotation on it. */
+.src-badge {
+  display: flex; align-items: center; gap: 4px;
+  height: 15px; padding: 0 5px;
+  font-family: var(--mono); font-size: var(--fs-xs);
+  letter-spacing: .03em;
+  color: var(--warn);
+  background: var(--warn-bg);
+  border: 1px solid rgba(210,153,34,.3);
+  border-radius: 1px;
+  white-space: nowrap;
+  cursor: help;
+}
+.src-badge.measured {
+  color: var(--ok); background: var(--ok-bg); border-color: rgba(63,185,80,.3);
+}
+
+.pane-body { flex: 1; position: relative; min-height: 0; overflow: hidden; }
+
+/* image pane */
+.canvas-wrap {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  padding: 8px;
+  background:
+    repeating-conic-gradient(var(--bg-0) 0% 25%, #101216 0% 50%) 0 0 / 16px 16px;
+}
+#overlayCanvas {
+  max-width: 100%; max-height: 100%;
+  object-fit: contain;
+  display: none;
+  cursor: crosshair;
+  outline: 1px solid var(--line-2);
+}
+#overlayCanvas.ready { display: block; }
+
+/* The <video> is the canvas's source, never shown -- but it must not be
+   display:none. A paused display:none video holds no composited frame, so
+   drawImage() silently yields nothing and the pane comes up blank. */
+#videoEl {
+  position: absolute; top: 0; left: 0;
+  width: 1px; height: 1px;
+  opacity: 0; pointer-events: none;
+}
+
+.empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 5px;
+  color: var(--fg-4);
+  pointer-events: none;
+}
+.empty .ic { width: 26px; height: 26px; stroke-width: 1.2; }
+.empty p { margin: 0; font-size: var(--fs); }
+.empty .k { font-family: var(--mono); font-size: var(--fs-sm); }
+
+#map, #scene { position: absolute; inset: 0; }
+#map { background: var(--bg-0); }
+#scene { background: var(--bg-0); }
+
+.pane-hint {
+  position: absolute; bottom: 5px; right: 6px;
+  font-family: var(--mono); font-size: var(--fs-xs);
+  color: var(--fg-4);
+  background: rgba(11,12,14,.8);
+  padding: 2px 5px;
+  pointer-events: none;
+}
+
+/* compass over the 3D pane */
+.compass {
+  position: absolute; bottom: 6px; left: 6px;
+  width: 46px; height: 46px;
+  background: rgba(11,12,14,.75);
+  border: 1px solid var(--line-2);
+  pointer-events: none;
+}
+.compass svg { width: 100%; height: 100%; }
+.compass circle { fill: none; stroke: var(--line-2); }
+.compass .n { fill: var(--err); }
+.compass .s { fill: var(--fg-4); }
+.compass text { font-family: var(--mono); font-size: 8px; fill: var(--fg-3); text-anchor: middle; }
+
+/* ══════════════════════════ TIMELINE ══════════════════════════ */
+
+.timeline {
+  display: grid;
+  grid-template-rows: var(--header) minmax(0, 1fr);
+  height: var(--timeline);
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+}
+.timeline.collapsed { height: var(--header); }
+.timeline.collapsed .tl-body { display: none; }
+
+.tl-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 6px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.tl-bar .clock {
+  font-family: var(--mono); font-size: var(--fs);
+  color: var(--fg);
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.tl-bar .sub {
+  font-family: var(--mono); font-size: var(--fs-xs);
+  color: var(--fg-4); white-space: nowrap;
+}
+.tl-bar .spacer { flex: 1; }
+.tl-bar select {
+  width: auto; height: 18px;
+  font-family: var(--mono); font-size: var(--fs-sm);
+  padding-right: 2px;
+}
+
+/* the streams area: a label gutter plus the time axis */
+.tl-body { display: grid; grid-template-columns: 132px minmax(0, 1fr); min-height: 0; }
+
+.tl-labels {
+  overflow: hidden auto;
+  border-right: 1px solid var(--line);
+  background: var(--bg-1);
+}
+.tl-label {
+  display: flex; align-items: center; gap: 5px;
+  height: 18px; padding: 0 6px;
+  font-family: var(--mono); font-size: var(--fs-xs);
+  color: var(--fg-2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tl-label:hover { background: var(--bg-3); }
+.tl-label.sel { background: var(--accent-bg); color: var(--fg); }
+.tl-label .sw { width: 7px; height: 7px; flex: 0 0 auto; }
+.tl-label .nm { overflow: hidden; text-overflow: ellipsis; }
+
+.tl-tracks { position: relative; overflow: hidden auto; cursor: pointer; }
+.tl-ruler {
+  position: sticky; top: 0; z-index: 2;
+  height: 14px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+}
+.tl-tick {
+  position: absolute; top: 0; bottom: 0;
+  border-left: 1px solid var(--line-2);
+  padding-left: 3px;
+  font-family: var(--mono); font-size: var(--fs-xs);
+  color: var(--fg-4);
+  line-height: 14px;
+  pointer-events: none;
+}
+.tl-row { position: relative; height: 18px; border-bottom: 1px solid var(--line-soft); }
+.tl-row:hover { background: var(--bg-3); }
+.tl-row.sel { background: var(--accent-bg); }
+/* A track's visible span: the frames where that object was actually seen. */
+.tl-span {
+  position: absolute; top: 5px; height: 8px;
+  border-radius: 1px;
+  opacity: .8;
+}
+.tl-row.sel .tl-span { opacity: 1; }
+.tl-sample {
+  position: absolute; top: 4px;
+  width: 1px; height: 10px;
+  background: rgba(255,255,255,.55);
+}
+
+.tl-playhead {
+  position: absolute; top: 0; bottom: 0;
+  width: 1px;
+  background: var(--playhead);
+  pointer-events: none;
+  z-index: 3;
+}
+.tl-playhead::before {
+  content: ""; position: absolute; top: 0; left: -3px;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 5px solid var(--playhead);
+}
+
+.tl-empty {
+  display: grid; place-items: center;
+  height: 100%;
+  font-family: var(--mono); font-size: var(--fs-sm);
+  color: var(--fg-4);
+}
+
+/* ══════════════════════════ STATUS BAR ══════════════════════════ */
+
+.statusbar {
+  display: flex; align-items: center; gap: 0;
+  height: var(--statusbar);
+  padding: 0 8px;
+  background: var(--bg-2);
+  border-top: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+  overflow: hidden;
+}
+.statusbar .item {
+  display: flex; align-items: center; gap: 5px;
+  padding: 0 10px;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+.statusbar .item:first-child { padding-left: 0; }
+.statusbar .item.last { border-right: 0; margin-left: auto; padding-right: 0; }
+.statusbar b { color: var(--fg); font-weight: 500; }
+
+/* ══════════════════════════ FULLSCREEN ══════════════════════════ */
+
+body.fs .menubar,
+body.fs .panel-left,
+body.fs .panel-right,
+body.fs .split,
+body.fs .centre > .table-panel,
+body.fs .centre > .split-h,
+body.fs .timeline,
+body.fs .statusbar { display: none; }
+body.fs .app { grid-template-rows: minmax(0, 1fr); }
+body.fs .work { grid-template-columns: minmax(0, 1fr); }
+body.fs .centre { grid-template-rows: minmax(0, 1fr); }
+
+/* ══════════════════════════ OVERLAYS ══════════════════════════ */
+
+.busy {
+  position: fixed; inset: 0; z-index: 900;
+  display: grid; place-items: center;
+  background: rgba(11,12,14,.7);
+}
+.busy-box {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 18px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  font-family: var(--mono); font-size: var(--fs);
+  color: var(--fg-2);
+}
+.spinner {
+  width: 13px; height: 13px;
+  border: 1.5px solid var(--line-2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+
+.toasts {
+  position: fixed; bottom: calc(var(--statusbar) + 8px); right: 10px;
+  z-index: 950;
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-end;
+  pointer-events: none;
+}
+.toast {
+  max-width: 420px;
+  padding: 5px 10px;
+  font-size: var(--fs);
+  color: var(--fg);
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r);
+}
+.toast.ok   { border-left-color: var(--ok); }
+.toast.err  { border-left-color: var(--err); }
+.toast.warn { border-left-color: var(--warn); }
+
+/* ══════════════════════════ NARROW ══════════════════════════ */
+
+@media (max-width: 1400px) { .stage span { display: none; } }
+@media (max-width: 1150px) {
+  .stages { display: none; }
+  .work { grid-template-columns: 200px 4px minmax(0,1fr) 4px 280px; }
+}

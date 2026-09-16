@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GeoDetect</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<!-- Inline symbol sheet. Icons are structural here (every tree row and pane
+     header carries one), so they load with the document rather than over the
+     network. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-cam" viewBox="0 0 24 24"><path d="M2 7h4l2-3h8l2 3h4v13H2z"/><circle cx="12" cy="13" r="4"/></symbol>
+    <symbol id="i-lidar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></symbol>
+    <symbol id="i-gps" viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+    <symbol id="i-img" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 16-5-5L6 20"/></symbol>
+    <symbol id="i-vid" viewBox="0 0 24 24"><rect x="2" y="5" width="14" height="14" rx="1"/><path d="m22 8-6 4 6 4z"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="m9 4-6 2v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></symbol>
+    <symbol id="i-3d" viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/></symbol>
+    <symbol id="i-tri" viewBox="0 0 24 24"><path d="m8 5 8 7-8 7z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m7 4 13 8-13 8z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M7 4h4v16H7zM13 4h4v16h-4z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-start" viewBox="0 0 24 24"><path d="M19 5v14L8 12zM5 5v14" /></symbol>
+    <symbol id="i-end" viewBox="0 0 24 24"><path d="M5 5v14l11-7zM19 5v14"/></symbol>
+    <symbol id="i-loop" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></symbol>
+    <symbol id="i-dl" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></symbol>
+    <symbol id="i-fs" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="2"/><path d="M12 3v4M9 12v2M15 12v2"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m1 0v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6"/></symbol>
+    <symbol id="i-run" viewBox="0 0 24 24"><path d="M5 3v18l15-9z" fill="currentColor" stroke="none"/></symbol>
+  </defs>
+</svg>
+</head>
+
+<body>
+<div class="app">
+
+  <!-- ══════════════════ MENU BAR ══════════════════ -->
+  <header class="menubar">
+    <div class="app-id">
+      <svg class="app-mark"><use href="#i-3d"/></svg>
+      <span class="app-name">GEODETECT</span>
+      <span class="app-ver">v3.0</span>
+    </div>
+    <div class="sep"></div>
+
+    <nav class="stages" id="stages" aria-label="Pipeline">
+      <div class="stage" data-stage="source"><span>source</span></div>
+      <div class="stage" data-stage="detect"><span>detect</span></div>
+      <div class="stage" data-stage="fuse"><span>fuse</span></div>
+      <div class="stage" data-stage="world"><span>world</span></div>
+      <div class="stage" data-stage="reason"><span>reason</span></div>
+    </nav>
+
+    <div class="spacer"></div>
+
+    <div class="chip" id="modelChip"><span class="dot" id="healthDot"></span><span id="healthText">…</span></div>
+    <div class="chip" id="llmChip"><span class="dot" id="llmDot"></span><span id="llmText">assistant</span></div>
+
+    <div class="menu-wrap">
+      <button class="btn" id="exportBtn" disabled>
+        <svg class="ic ic-sm"><use href="#i-dl"/></svg>Export
+      </button>
+      <div class="menu" id="exportMenu" hidden>
+        <button data-fmt="geojson">GeoJSON<span>QGIS</span></button>
+        <button data-fmt="json">JSON<span>full</span></button>
+        <button data-fmt="csv">CSV<span>table</span></button>
+        <hr>
+        <button data-fmt="png">Screenshot<span>PNG</span></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════════════ WORKSPACE ══════════════════ -->
+  <div class="work" id="work">
+
+    <!-- ───────── LEFT: sources, sensors, settings ───────── -->
+    <aside class="panel panel-left" id="panelLeft">
+      <div class="panel-head">
+        <span class="t">Sources</span>
+        <span class="grow"></span>
+        <button class="ib" id="openBtn" title="Open image or video">
+          <svg class="ic ic-sm"><use href="#i-dl"/></svg>
+        </button>
+      </div>
+
+      <div class="panel-body">
+        <input type="file" id="fileInput" hidden>
+
+        <!-- datasets -->
+        <div class="tree">
+          <div class="tree-group" data-group="sources">
+            <div class="tree-head">
+              <span class="tw"><svg class="ic ic-sm"><use href="#i-tri"/></svg></span>
+              <span class="lbl">Datasets</span>
+              <span class="meta" id="sourceCount"></span>
+            </div>
+            <div class="tree-items" id="sourceList"></div>
+          </div>
+
+          <!-- sensors present in the active source -->
+          <div class="tree-group" data-group="sensors">
+            <div class="tree-head">
+              <span class="tw"><svg class="ic ic-sm"><use href="#i-tri"/></svg></span>
+              <span class="lbl">Sensors</span>
+              <span class="meta" id="sensorMeta">—</span>
+            </div>
+            <div class="tree-items" id="sensorList">
+              <div class="sensor-row off"><span class="nm">no source loaded</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="drop" id="dropzone" tabindex="0" role="button">
+          Drop image or video
+          <span class="k" id="dropHint">JPG PNG WEBP TIFF MP4 MOV WEBM</span>
+        </div>
+
+        <div class="prog" id="prog" hidden>
+          <div class="prog-top"><span id="progText">working</span><span id="progPct">0%</span></div>
+          <div class="prog-rail"><div class="prog-fill" id="progFill"></div></div>
+        </div>
+
+        <div class="section-note" id="exifNote" hidden></div>
+        <div class="section-note ok" id="poseNote" hidden></div>
+
+        <!-- camera model -->
+        <div class="tree">
+          <div class="tree-group" data-group="camera">
+            <div class="tree-head">
+              <span class="tw"><svg class="ic ic-sm"><use href="#i-tri"/></svg></span>
+              <span class="lbl">Camera model</span>
+              <span class="meta" id="camSourceMeta">manual</span>
+            </div>
+            <div class="tree-items">
+              <div class="prop">
+                <span class="k">preset</span>
+                <div class="seg" id="presetRow">
+                  <button data-preset="drone_nadir">nadir</button>
+                  <button data-preset="drone_oblique">obliq</button>
+                  <button data-preset="street">street</button>
+                </div>
+              </div>
+              <div class="prop">
+                <label for="altitude">altitude</label>
+                <div class="pair">
+                  <input type="range" id="altitudeRange" min="1" max="300" step="0.5" value="60">
+                  <input type="number" id="altitude" class="num" step="0.1" value="60">
+                </div>
+              </div>
+              <div class="prop">
+                <label for="pitch">pitch</label>
+                <div class="pair">
+                  <input type="range" id="pitchRange" min="0" max="90" step="1" value="45">
+                  <input type="number" id="pitch" class="num" step="0.5" value="45">
+                </div>
+              </div>
+              <div class="prop">
+                <label for="heading">heading</label>
+                <div class="pair">
+                  <input type="range" id="headingRange" min="0" max="359" step="1" value="0">
+                  <input type="number" id="heading" class="num" step="1" value="0">
+                </div>
+              </div>
+              <div class="prop">
+                <label for="hfov">h-fov</label>
+                <div class="pair">
+                  <input type="range" id="hfovRange" min="10" max="150" step="1" value="78">
+                  <input type="number" id="hfov" class="num" step="0.5" value="78">
+                </div>
+              </div>
+              <div class="prop">
+                <label for="lat">latitude</label>
+                <input type="number" id="lat" class="num" step="0.000001" value="47.376900">
+              </div>
+              <div class="prop">
+                <label for="lon">longitude</label>
+                <input type="number" id="lon" class="num" step="0.000001" value="8.541700">
+              </div>
+              <div class="prop">
+                <label for="maxRange">max range</label>
+                <input type="number" id="maxRange" class="num" step="10" value="500">
+              </div>
+              <div class="prop"><span class="k">derived</span>
+                <span class="v" id="derivedFov">—</span></div>
+              <div class="prop"><span class="k">focal</span>
+                <span class="v" id="derivedFocal">—</span></div>
+            </div>
+          </div>
+
+          <!-- inference -->
+          <div class="tree-group" data-group="infer">
+            <div class="tree-head">
+              <span class="tw"><svg class="ic ic-sm"><use href="#i-tri"/></svg></span>
+              <span class="lbl">Inference</span>
+              <span class="meta" id="modelMeta">—</span>
+            </div>
+            <div class="tree-items">
+              <div class="prop">
+                <label for="confidence">conf</label>
+                <div class="pair">
+                  <input type="range" id="confidence" min="0.05" max="0.95" step="0.05" value="0.35">
+                  <span class="v" id="confVal" style="width:30px">0.35</span>
+                </div>
+              </div>
+              <div class="prop">
+                <label for="iou">nms iou</label>
+                <div class="pair">
+                  <input type="range" id="iou" min="0.1" max="0.9" step="0.05" value="0.45">
+                  <span class="v" id="iouVal" style="width:30px">0.45</span>
+                </div>
+              </div>
+              <div class="prop prop-wide" style="padding-top:4px">
+                <button class="btn btn-primary btn-wide" id="runBtn" disabled>
+                  <svg class="ic ic-sm"><use href="#i-run"/></svg>Run pipeline
+                </button>
+              </div>
+              <div class="prop-note" id="rerunHint" hidden
+                   style="grid-column:1/-1;text-align:center;color:var(--warn);padding:3px 0">
+                detector settings changed — re-run
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="split" id="splitL" role="separator" tabindex="0"></div>
+
+    <!-- ───────── CENTRE: viewport + object table ───────── -->
+    <main class="centre" id="centre">
+
+      <section class="viewport" id="viewport" data-view="grid">
+
+        <!-- detection pane -->
+        <section class="pane pane-image" data-pane="image">
+          <header class="pane-head">
+            <svg class="ic ic-sm"><use href="#i-img"/></svg>
+            <span class="t">detection</span>
+            <span class="frame-info mono" id="imageInfo"></span>
+            <span class="grow"></span>
+            <span class="src-badge" id="srcBadge" title="How these positions were obtained">estimated</span>
+            <button class="ib" data-solo="image" title="Solo this pane"><svg class="ic ic-sm"><use href="#i-fs"/></svg></button>
+          </header>
+          <div class="pane-body">
+            <div class="canvas-wrap">
+              <video id="videoEl" playsinline muted></video>
+              <canvas id="overlayCanvas"></canvas>
+            </div>
+            <div class="empty" id="imageEmpty">
+              <svg class="ic"><use href="#i-img"/></svg>
+              <p>no source</p>
+              <p class="k">pick a dataset on the left</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- map pane -->
+        <section class="pane pane-map" data-pane="map">
+          <header class="pane-head">
+            <svg class="ic ic-sm"><use href="#i-map"/></svg>
+            <span class="t">map</span>
+            <span class="frame-info mono">wgs84 · epsg:4326</span>
+            <span class="grow"></span>
+            <button class="ib" data-solo="map" title="Solo this pane"><svg class="ic ic-sm"><use href="#i-fs"/></svg></button>
+          </header>
+          <div class="pane-body"><div id="map"></div></div>
+        </section>
+
+        <!-- 3d pane -->
+        <section class="pane pane-scene" data-pane="scene">
+          <header class="pane-head">
+            <svg class="ic ic-sm"><use href="#i-3d"/></svg>
+            <span class="t">3d</span>
+            <span class="frame-info mono">local enu · metres</span>
+            <span class="grow"></span>
+            <label class="sensor-row" style="height:auto;padding:0;gap:4px" title="Rays from the camera to each object, and distance rings">
+              <input type="checkbox" id="showRays" checked><span class="val">rays</span>
+            </label>
+            <label class="sensor-row" style="height:auto;padding:0;gap:4px" title="Motion trails">
+              <input type="checkbox" id="showTrails" checked><span class="val">trails</span>
+            </label>
+            <button class="ib" data-solo="scene" title="Solo this pane"><svg class="ic ic-sm"><use href="#i-fs"/></svg></button>
+          </header>
+          <div class="pane-body">
+            <div id="scene"></div>
+            <div class="compass"><svg viewBox="0 0 46 46">
+              <g id="compassRose">
+                <circle cx="23" cy="23" r="17"/>
+                <path d="M23 8 L26 23 L23 20 L20 23 Z" class="n"/>
+                <path d="M23 38 L20 23 L23 26 L26 23 Z" class="s"/>
+              </g>
+              <text x="23" y="7">N</text>
+            </svg></div>
+            <div class="pane-hint">drag orbit · scroll zoom</div>
+          </div>
+        </section>
+      </section>
+
+      <div class="split split-h" id="splitTable" role="separator" tabindex="0"></div>
+
+      <!-- object table -->
+      <section class="table-panel" id="tablePanel">
+        <div class="panel-head">
+          <span class="t">Objects</span>
+          <span class="count" id="objCount">0</span>
+          <div class="chips" id="filters"></div>
+          <span class="grow"></span>
+          <div class="selchip" id="selChip" hidden>
+            <span id="selLabel"></span><button id="selClear" title="Clear">×</button>
+          </div>
+          <input type="search" id="qfilter" class="qfilter" placeholder="filter class">
+          <div class="seg" id="viewSeg" style="width:150px">
+            <button data-view="image">img</button>
+            <button data-view="map">map</button>
+            <button data-view="scene">3d</button>
+            <button data-view="grid" class="on">all</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="otable">
+            <thead><tr>
+              <th class="idx">#</th>
+              <th>object</th>
+              <th class="n">conf</th>
+              <th class="n" title="bbox centre, pixels">x</th>
+              <th class="n" title="bbox centre, pixels">y</th>
+              <th class="n" title="metres east of camera">east</th>
+              <th class="n" title="metres north of camera">north</th>
+              <th class="n">lat</th>
+              <th class="n">lon</th>
+              <th class="n" title="horizontal distance">dist</th>
+              <th class="n" title="compass bearing">brg</th>
+              <th class="n" title="estimated w × h">size</th>
+            </tr></thead>
+            <tbody id="objBody"></tbody>
+          </table>
+          <div class="table-empty" id="tableEmpty">no objects</div>
+        </div>
+      </section>
+    </main>
+
+    <div class="split" id="splitR" role="separator" tabindex="0"></div>
+
+    <!-- ───────── RIGHT: inspector + assistant ───────── -->
+    <aside class="panel panel-right" id="panelRight">
+      <div class="panel-head">
+        <span class="t">Inspector</span>
+        <span class="grow"></span>
+      </div>
+      <div id="inspector" style="flex:0 0 auto;max-height:34%;overflow:auto;border-bottom:1px solid var(--line)">
+        <div class="inspect-empty">Nothing selected.</div>
+      </div>
+
+      <div class="panel-head">
+        <svg class="ic ic-sm"><use href="#i-bot"/></svg>
+        <span class="t">Assistant</span>
+        <span class="count mono" id="assistantModel">—</span>
+        <span class="grow"></span>
+        <button class="ib" id="clearChat" title="Clear"><svg class="ic ic-sm"><use href="#i-trash"/></svg></button>
+      </div>
+
+      <div class="assistant">
+        <div class="chat" id="chat">
+          <div class="chat-intro">
+            <p>I reason over the <b>measured</b> scene graph — classes, distances, bearings, coordinates — not over the image.</p>
+            <p>Ask a question, or tell me what to highlight. Selections apply to every pane.</p>
+          </div>
+        </div>
+        <div class="suggest" id="suggest"></div>
+        <form class="composer" id="composer">
+          <textarea id="chatInput" rows="1" placeholder="ask about the scene"></textarea>
+          <button type="submit" class="ib" id="sendBtn" title="Send"><svg class="ic ic-sm"><use href="#i-send"/></svg></button>
+        </form>
+      </div>
+
+      <div class="panel-head">
+        <span class="t">Scene graph</span>
+        <span class="grow"></span>
+      </div>
+      <pre class="scene-tree" id="sceneTree" style="flex:0 0 auto;max-height:26%">—</pre>
+    </aside>
+  </div>
+
+  <!-- ══════════════════ TIMELINE ══════════════════ -->
+  <section class="timeline collapsed" id="timeline">
+    <div class="tl-bar">
+      <button class="ib" id="tlToggle" title="Show or hide tracks"><svg class="ic ic-sm"><use href="#i-tri"/></svg></button>
+      <button class="ib" id="btnStart" title="Go to start" disabled><svg class="ic ic-sm"><use href="#i-start"/></svg></button>
+      <button class="ib" id="btnPlay" title="Play / pause (space)" disabled><svg class="ic ic-sm" id="playIcon"><use href="#i-play"/></svg></button>
+      <button class="ib" id="btnEnd" title="Go to end" disabled><svg class="ic ic-sm"><use href="#i-end"/></svg></button>
+      <button class="ib" id="btnLoop" title="Loop"><svg class="ic ic-sm"><use href="#i-loop"/></svg></button>
+      <div class="sep" style="width:1px;height:14px;background:var(--line-2)"></div>
+      <span class="clock" id="tlClock">--:--.---</span>
+      <span class="sub" id="tlSub">no sequence</span>
+      <span class="spacer"></span>
+      <span class="sub" id="tlTrackCount"></span>
+      <select id="tlSpeed" title="Playback speed">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+      </select>
+    </div>
+    <div class="tl-body">
+      <div class="tl-labels" id="tlLabels"></div>
+      <div class="tl-tracks" id="tlTracks">
+        <div class="tl-ruler" id="tlRuler"></div>
+        <div id="tlRows"></div>
+        <div class="tl-playhead" id="tlPlayhead" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════ STATUS BAR ══════════════════ -->
+  <footer class="statusbar" id="statusbar">
+    <div class="item"><span id="stSource">no source</span></div>
+    <div class="item">obj <b id="stObjects">0</b></div>
+    <div class="item">cls <b id="stClasses">0</b></div>
+    <div class="item">conf <b id="stConf">—</b></div>
+    <div class="item">infer <b id="stInfer">—</b></div>
+    <div class="item">fps <b id="stFps">—</b></div>
+    <div class="item">near <b id="stNear">—</b></div>
+    <div class="item">far <b id="stFar">—</b></div>
+    <div class="item">area <b id="stArea">—</b></div>
+    <div class="item last"><span id="stPos">—</span></div>
+  </footer>
+</div>
+
+<div class="busy" id="busy" hidden>
+  <div class="busy-box"><div class="spinner"></div><span id="busyText">working</span></div>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

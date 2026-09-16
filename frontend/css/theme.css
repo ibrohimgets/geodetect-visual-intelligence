@@ -1,0 +1,300 @@
+/* ============================================================================
+   GeoDetect — design tokens.
+
+   The idiom here is the sensor-workbench one shared by tools like Foxglove
+   Studio, Rerun and RViz, and it is a deliberate set of choices rather than a
+   style:
+
+     * Near-black ground, because the content is imagery, point clouds and
+       3D scenes. Any lightness in the chrome competes with the data.
+     * Flat. One-pixel borders do all the separating; no shadows, no gradients,
+       no blur. Depth cues are reserved for the 3D view, where they mean
+       something.
+     * Square. Radii are 0-3px. Rounded cards read as a web dashboard.
+     * Dense. 11px UI text, 18-22px rows. These tools are read for hours by
+       people who want more on screen, not more air.
+     * Monospace for every number, path and identifier, so columns align and
+       digits stop shifting as values change.
+     * Colour is data, not decoration. One accent for selection; everything
+       else earns its colour by encoding a class or a state.
+   ========================================================================== */
+
+:root {
+  /* ---- ground, darkest to lightest ---- */
+  --bg-0:      #0b0c0e;   /* viewport / canvas void */
+  --bg-1:      #131519;   /* panel body */
+  --bg-2:      #181b20;   /* panel header, toolbar */
+  --bg-3:      #1f232a;   /* hover */
+  --bg-4:      #262b33;   /* active / pressed */
+  --bg-input:  #0e1013;
+
+  /* ---- lines ---- */
+  --line:      #24282f;
+  --line-2:    #2f343d;
+  --line-soft: #1b1e24;
+
+  /* ---- ink ---- */
+  --fg:        #d6dae1;
+  --fg-2:      #98a0ac;
+  --fg-3:      #6d7480;
+  --fg-4:      #4d535d;
+
+  /* ---- accent: selection and focus only ---- */
+  --accent:      #4c8dff;
+  --accent-2:    #2f6fe0;
+  --accent-bg:   rgba(76, 141, 255, .16);
+  --accent-line: rgba(76, 141, 255, .45);
+
+  /* ---- state ---- */
+  --ok:        #3fb950;
+  --ok-bg:     rgba(63, 185, 80, .14);
+  --warn:      #d29922;
+  --warn-bg:   rgba(210, 153, 34, .14);
+  --err:       #f85149;
+  --err-bg:    rgba(248, 81, 73, .14);
+
+  /* the playhead, amber the way a scrub marker usually is */
+  --playhead:  #e8a33d;
+
+  /* ---- type ---- */
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", Menlo,
+          Consolas, "Liberation Mono", monospace;
+
+  --fs-xs:  9.5px;
+  --fs-sm:  10.5px;
+  --fs:     11.5px;
+  --fs-md:  12.5px;
+
+  /* ---- metrics ---- */
+  --row:        22px;   /* tree / table row height */
+  --header:     26px;   /* panel + pane title bars */
+  --topbar:     34px;
+  --statusbar:  22px;
+  --timeline:   150px;
+  --rail-l:     260px;
+  --rail-r:     340px;
+  --r:          2px;    /* the only radius worth having */
+}
+
+* { box-sizing: border-box; }
+
+/* Several elements are toggled with the `hidden` attribute while also carrying
+   an author `display`, which would otherwise win. */
+[hidden] { display: none !important; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg-0);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: var(--fs);
+  line-height: 1.4;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { margin: 0; font-size: inherit; font-weight: 600; }
+button, input, select, textarea { font-family: inherit; font-size: inherit; }
+
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.dim  { color: var(--fg-3); }
+
+/* ---- scrollbars: present, but quiet ---- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #2c313a;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover { background: #3a414c; background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+/* ══════════════════════════ CONTROLS ══════════════════════════ */
+
+input[type="text"], input[type="number"], input[type="search"], textarea, select {
+  height: 20px;
+  padding: 0 5px;
+  color: var(--fg);
+  background: var(--bg-input);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  font-size: var(--fs);
+  width: 100%;
+}
+textarea { height: auto; padding: 4px 6px; line-height: 1.45; resize: none; }
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+input:disabled, textarea:disabled, select:disabled {
+  color: var(--fg-3);
+  background: var(--bg-1);
+  cursor: not-allowed;
+}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+input.num { text-align: right; font-family: var(--mono); }
+
+/* Sliders are thin rails with a square grip -- a round bubble reads as web UI. */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 2px;
+  background: var(--line-2);
+  outline: none;
+  cursor: ew-resize;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 9px; height: 14px;
+  background: var(--fg-2);
+  border: 0; border-radius: 1px;
+  cursor: ew-resize;
+}
+input[type="range"]:hover::-webkit-slider-thumb { background: var(--fg); }
+input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-4); cursor: not-allowed; }
+input[type="range"]::-moz-range-thumb {
+  width: 9px; height: 14px;
+  background: var(--fg-2); border: 0; border-radius: 1px; cursor: ew-resize;
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  width: 12px; height: 12px;
+  margin: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--line-2);
+  border-radius: 1px;
+  cursor: pointer;
+  position: relative;
+  flex: 0 0 auto;
+}
+input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute; left: 3px; top: 0.5px;
+  width: 3px; height: 7px;
+  border: solid #fff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+/* ---- buttons ---- */
+
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  color: var(--fg);
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  font-size: var(--fs);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(--bg-4); border-color: var(--fg-4); }
+.btn:active:not(:disabled) { background: var(--bg-2); }
+.btn:disabled { color: var(--fg-4); cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent-2);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent); }
+.btn-primary:disabled { background: var(--bg-3); border-color: var(--line-2); }
+.btn-wide { width: 100%; justify-content: center; height: 24px; }
+
+/* Icon-only buttons, the workhorse of these toolbars. */
+.ib {
+  display: inline-grid; place-items: center;
+  width: 20px; height: 20px;
+  color: var(--fg-3);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.ib:hover { color: var(--fg); background: var(--bg-3); }
+.ib.on { color: var(--accent); background: var(--accent-bg); }
+.ib:disabled { color: var(--fg-4); cursor: not-allowed; background: none; }
+
+.ic {
+  width: 13px; height: 13px;
+  fill: none; stroke: currentColor; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+  flex: 0 0 auto;
+}
+.ic-sm { width: 11px; height: 11px; }
+
+/* ---- segmented control ---- */
+
+.seg {
+  display: flex;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.seg button {
+  flex: 1;
+  height: 20px;
+  color: var(--fg-3);
+  background: var(--bg-input);
+  border: 0;
+  border-right: 1px solid var(--line-2);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.seg button:last-child { border-right: 0; }
+.seg button:hover { color: var(--fg); background: var(--bg-3); }
+.seg button.on { color: #fff; background: var(--accent-2); }
+
+/* ---- labels and badges ---- */
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+
+.tag {
+  display: inline-flex; align-items: center;
+  height: 14px; padding: 0 4px;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  letter-spacing: .04em;
+  border: 1px solid;
+  border-radius: 1px;
+}
+.tag-ok   { color: var(--ok);   background: var(--ok-bg);   border-color: rgba(63,185,80,.3); }
+.tag-warn { color: var(--warn); background: var(--warn-bg); border-color: rgba(210,153,34,.3); }
+.tag-info { color: var(--accent); background: var(--accent-bg); border-color: var(--accent-line); }
+.tag-mute { color: var(--fg-3); background: var(--bg-3); border-color: var(--line-2); }
+
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-4); flex: 0 0 auto; }
+.dot.ok  { background: var(--ok); }
+.dot.err { background: var(--err); }
+.dot.busy { background: var(--warn); animation: blink 1s steps(2, start) infinite; }
+
+@keyframes blink { 50% { opacity: .25; } }
+@keyframes spin  { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
